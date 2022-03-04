@@ -29,12 +29,21 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.media.AudioManager;
 import android.nfc.NfcAdapter;
+import android.net.ConnectivityManager;
+import android.net.INetworkPolicyListener;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkPolicyManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.os.ServiceManager;
+import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -46,6 +55,7 @@ import android.util.ArraySet;
 import android.util.Log;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.lifecycle.Observer;
 
 import com.android.systemui.broadcast.BroadcastDispatcher;
@@ -127,6 +137,7 @@ public class PhoneStatusBarPolicy
     private final String mSlotConnectedDisplay;
     private final String mSlotNfc;
     private final String mSlotNetworkTraffic;
+    private final String mSlotFirewall;
     private final int mDisplayId;
     private final SharedPreferences mSharedPreferences;
     private final DateFormatUtil mDateFormatUtil;
@@ -157,6 +168,8 @@ public class PhoneStatusBarPolicy
     private final SensorPrivacyController mSensorPrivacyController;
     private final RecordingController mRecordingController;
     private final RingerModeTracker mRingerModeTracker;
+    private final ConnectivityManager mConnectivityManager;
+    private final NetworkPolicyManager mNetworkPolicyManager;
 
     private boolean mZenVisible;
     private boolean mVibrateVisible;
@@ -164,6 +177,9 @@ public class PhoneStatusBarPolicy
     private boolean mCurrentUserSetup;
 
     private boolean mProfileIconVisible = false;
+    private boolean mFirewallVisible = false;
+
+    private int mLastResumedActivityUid = -1;
 
     private BluetoothController mBluetooth;
     private AlarmManager.AlarmClockInfo mNextAlarm;
@@ -226,6 +242,8 @@ public class PhoneStatusBarPolicy
         mTelecomManager = telecomManager;
         mRingerModeTracker = ringerModeTracker;
         mJavaAdapter = javaAdapter;
+        mConnectivityManager = context.getSystemService(ConnectivityManager.class);
+        mNetworkPolicyManager = context.getSystemService(NetworkPolicyManager.class);
 
         mSlotCast = resources.getString(com.android.internal.R.string.status_bar_cast);
         mSlotConnectedDisplay = resources.getString(
@@ -248,6 +266,7 @@ public class PhoneStatusBarPolicy
         mSlotNfc = resources.getString(com.android.internal.R.string.status_bar_nfc);
         mCurrentUserSetup = mProvisionedController.isDeviceProvisioned();
         mSlotNetworkTraffic = resources.getString(com.android.internal.R.string.status_bar_network_traffic);
+        mSlotFirewall = resources.getString(R.string.status_bar_firewall_slot);
 
         mDisplayId = displayId;
         mSharedPreferences = sharedPreferences;
@@ -278,6 +297,8 @@ public class PhoneStatusBarPolicy
 
         // listen for user / profile change.
         mUserTracker.addCallback(mUserSwitchListener, mMainExecutor);
+
+        mNetworkPolicyManager.registerListener(mNetworkPolicyListener);
 
         // TTY status
         updateTTY();
@@ -348,6 +369,10 @@ public class PhoneStatusBarPolicy
         mShowNetworkTraffic = Settings.Secure.getIntForUser(mContext.getContentResolver(),
             NETWORK_TRAFFIC_LOCATION, 0, UserHandle.USER_CURRENT) == 1;
         updateNetworkTraffic();
+
+        // firewall
+        mIconController.setIcon(mSlotFirewall, R.drawable.stat_sys_firewall, null);
+        mIconController.setIconVisibility(mSlotFirewall, mFirewallVisible);
 
         mRotationLockController.addCallback(this);
         mBluetooth.addCallback(this);
@@ -627,6 +652,72 @@ public class PhoneStatusBarPolicy
         });
     }
 
+    private void updateFirewall() {
+        mUiBgExecutor.execute(() -> {
+            try {
+                final int uid = ActivityTaskManager.getService().getLastResumedActivityUid();
+                if (mLastResumedActivityUid != uid) {
+                    mLastResumedActivityUid = uid;
+                    try {
+                        mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
+                    } catch (IllegalArgumentException e) {
+                        // Ignore
+                    }
+                    mConnectivityManager.registerDefaultNetworkCallbackForUid(uid, mNetworkCallback,
+                            mHandler);
+                }
+                final boolean isRestricted =
+                        mNetworkPolicyManager.isUidNetworkingBlocked(uid, false /*meteredNetwork*/);
+                boolean isLauncher = false;
+                List<ResolveInfo> homeActivities =
+                        mContext.getPackageManager().queryIntentActivitiesAsUser(
+                                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                                        .addCategory(Intent.CATEGORY_DEFAULT),
+                                PackageManager.ResolveInfoFlags.of(0), UserHandle.getUserId(uid));
+                for (ResolveInfo homeActivity : homeActivities) {
+                    if (uid == homeActivity.activityInfo.applicationInfo.uid) {
+                        isLauncher = true;
+                        break;
+                    }
+                }
+                final boolean finalIsLauncher = isLauncher;
+                mHandler.post(() -> {
+                    final boolean showIcon;
+                    if (!finalIsLauncher && isRestricted && (!mKeyguardStateController.isShowing()
+                            || mKeyguardStateController.isOccluded())) {
+                        showIcon = true;
+                        mIconController.setIcon(mSlotFirewall, R.drawable.stat_sys_firewall, null);
+                    } else {
+                        showIcon = false;
+                    }
+                    if (mFirewallVisible != showIcon) {
+                        mIconController.setIconVisibility(mSlotFirewall, showIcon);
+                        mFirewallVisible = showIcon;
+                    }
+                });
+            } catch (RemoteException e) {
+                Log.w(TAG, "updateFirewall: ", e);
+            }
+        });
+    }
+
+    private final ConnectivityManager.NetworkCallback mNetworkCallback =
+            new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onCapabilitiesChanged(@NonNull Network network,
+                        @NonNull NetworkCapabilities networkCapabilities) {
+                    mHandler.post(() -> updateFirewall());
+                }
+            };
+
+    private final INetworkPolicyListener mNetworkPolicyListener =
+            new NetworkPolicyManager.Listener() {
+        @Override
+        public void onUidPoliciesChanged(int uid, int uidPolicies) {
+            mHandler.post(() -> updateFirewall());
+        }
+    };
+
     private final UserTracker.Callback mUserSwitchListener =
             new UserTracker.Callback() {
                 @Override
@@ -682,6 +773,7 @@ public class PhoneStatusBarPolicy
             boolean forced) {
         if (mDisplayId == displayId) {
             updateProfileIcon();
+            updateFirewall();
         }
     }
 
@@ -695,6 +787,7 @@ public class PhoneStatusBarPolicy
     @Override
     public void onKeyguardShowingChanged() {
         updateProfileIcon();
+        updateFirewall();
     }
 
     @Override

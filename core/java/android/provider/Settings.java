@@ -12755,10 +12755,10 @@ public final class Settings {
         public static final String STYLUS_POINTER_ICON_ENABLED = "stylus_pointer_icon_enabled";
 
         /**
-         * Whether to turn on black theme
+         * Switch to change custom system theme
          * @hide
          */
-        public static final String SYSTEM_BLACK_THEME = "system_black_theme";
+        public static final String SYSTEM_CUSTOM_THEME = "system_custom_theme";
 
         /**
          * These entries are considered common between the personal and the managed profile,

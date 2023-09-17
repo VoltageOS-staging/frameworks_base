@@ -56,6 +56,11 @@ public class DesktopModeLaunchParamsModifier implements LaunchParamsModifier {
             "persist.wm.debug.desktop_mode_enforce_device_restrictions", true);
 
     private StringBuilder mLogBuilder;
+    private static final int OFFSET_X_DP = 100;
+    private static final int OFFSET_Y_DP = 100;
+
+    private int mLastOffsetX = 0;
+    private int mLastOffsetY = 0;
 
     private final Context mContext;
 
@@ -173,8 +178,12 @@ public class DesktopModeLaunchParamsModifier implements LaunchParamsModifier {
         final int desiredHeight = (int) (stableBounds.height() * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
         outParams.mBounds.right = desiredWidth;
         outParams.mBounds.bottom = desiredHeight;
-        outParams.mBounds.offset(stableBounds.centerX() - outParams.mBounds.centerX(),
-                stableBounds.centerY() - outParams.mBounds.centerY());
+        if (outParams.mBounds.right > stableBounds.right) {
+            mLastOffsetX = 0;
+        }
+        if (outParams.mBounds.bottom > stableBounds.bottom) {
+            mLastOffsetY = 0;
+        }
     }
 
     private void initLogBuilder(Task task, ActivityRecord activity) {

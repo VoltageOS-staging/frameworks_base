@@ -155,6 +155,9 @@ public class NotificationShadeWindowViewController implements Dumpable {
             };
     private final SystemClock mClock;
 
+    private GestureDetector mQQSGestureHandler;
+    private final QQSGestureListener mQQSGestureListener;
+
     @ExperimentalCoroutinesApi
     @Inject
     public NotificationShadeWindowViewController(
@@ -193,7 +196,8 @@ public class NotificationShadeWindowViewController implements Dumpable {
             QuickSettingsController quickSettingsController,
             PrimaryBouncerInteractor primaryBouncerInteractor,
             AlternateBouncerInteractor alternateBouncerInteractor,
-            BouncerViewBinder bouncerViewBinder) {
+            BouncerViewBinder bouncerViewBinder,
+            QQSGestureListener qqsGestureListener) {
         mLockscreenShadeTransitionController = transitionController;
         mFalsingCollector = falsingCollector;
         mStatusBarStateController = statusBarStateController;
@@ -223,6 +227,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
         mPrimaryBouncerInteractor = primaryBouncerInteractor;
         mAlternateBouncerInteractor = alternateBouncerInteractor;
         mQuickSettingsController = quickSettingsController;
+        mQQSGestureListener = qqsGestureListener;
 
         // This view is not part of the newly inflated expanded status bar.
         mBrightnessMirror = mView.findViewById(R.id.brightness_mirror_container);
@@ -304,6 +309,10 @@ public class NotificationShadeWindowViewController implements Dumpable {
             mDreamingWakeupGestureHandler = new GestureDetector(mView.getContext(),
                     mLockscreenHostedDreamGestureListener);
         }
+
+        mQQSGestureHandler = new GestureDetector(mView.getContext(),
+                mQQSGestureListener);
+
         mView.setLayoutInsetsController(mNotificationInsetsController);
         mView.setInteractionEventHandler(new NotificationShadeWindowView.InteractionEventHandler() {
             boolean mUseDragDownHelperForTouch = false;
@@ -369,6 +378,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 }
 
                 mFalsingCollector.onTouchEvent(ev);
+                mQQSGestureHandler.onTouchEvent(ev);
                 mPulsingWakeupGestureHandler.onTouchEvent(ev);
 
                 if (!SceneContainerFlag.isEnabled()

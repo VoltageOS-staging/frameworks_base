@@ -12919,6 +12919,12 @@ public final class Settings {
                 "com.android.server.display.HBM_SETTING_KEY";
 
         /**
+         * Custom time when user is scheduled to deactivate
+         * @hide
+         */
+        public static final String USER_ACTIVITY_END_TIME = "user_activity_end_time";
+
+        /**
          * Whether volume panel should appear on the left (or right).
          * 0 = false (on the right)
          * 1 = true (on the left)

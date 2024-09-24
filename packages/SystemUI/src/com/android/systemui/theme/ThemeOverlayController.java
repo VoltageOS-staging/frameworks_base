@@ -498,32 +498,6 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
             reevaluateSystemTheme(true /* forceReload */);
         });
 
-        mSecureSettings.registerContentObserverForUserSync(
-                Settings.Secure.getUriFor(Settings.Secure.SYSTEM_CUSTOM_THEME),
-                false,
-                new ContentObserver(mBgHandler) {
-                    @Override
-                    public void onChange(boolean selfChange, Collection<Uri> collection, int flags,
-                            int userId) {
-                        if (DEBUG) Log.d(TAG, "Overlay changed for user: " + userId);
-                        if (mUserTracker.getUserId() != userId) {
-                            return;
-                        }
-                        if (!mDeviceProvisionedController.isUserSetup(userId)) {
-                            Log.i(TAG, "Theme application deferred when setting changed.");
-                            mDeferredThemeEvaluation = true;
-                            return;
-                        }
-                        if (mSkipSettingChange) {
-                            if (DEBUG) Log.d(TAG, "Skipping setting change");
-                            mSkipSettingChange = false;
-                            return;
-                        }
-                        reevaluateSystemTheme(true /* forceReload */);
-                    }
-                },
-                UserHandle.USER_ALL);
-
         mUserTracker.addCallback(mUserTrackerCallback, mMainExecutor);
 
         mConfigurationController.addCallback(mConfigurationListener);
@@ -844,13 +818,9 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
 
         FabricatedOverlay[] fOverlays = null;
 
-        boolean nightMode = (mContext.getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        int customTheme = mSecureSettings.getInt(Settings.Secure.SYSTEM_CUSTOM_THEME, 0);
-        // If custom Theme is 0, that would mean use default system dark theme
-        boolean isCustomTheme = nightMode && (customTheme != 0);
+        boolean isBlackTheme = mSecureSettings.getInt(SYSTEM_BLACK_THEME, 0) == 1;
 
-        mThemeManager.setIsCustomTheme(isCustomTheme);
+        mThemeManager.setIsBlackTheme(isBlackTheme);
 
         if (mNeedsOverlayCreation) {
             mNeedsOverlayCreation = false;
@@ -862,7 +832,7 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
         mThemeManager.applyCurrentUserOverlays(categoryToPackage, fOverlays, currentUser,
                 managedProfiles, onCompleteCallback);
 
-        mThemeManager.applyCustomTheme(customTheme, isCustomTheme);
+        mThemeManager.applyBlackTheme(isBlackTheme);
     }
 
     private Style fetchThemeStyleFromSetting() {

@@ -31,7 +31,6 @@ import com.android.internal.R
 import com.android.internal.messages.nano.SystemMessageProto
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage.NOTE_GLOBAL_SCREENSHOT
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage.NOTE_GLOBAL_SCREENSHOT_EXTERNAL_DISPLAY
-import com.android.systemui.screenshot.ScreenshotController.SCREENSHOT_URI_ID
 import com.android.systemui.SystemUIApplication
 import com.android.systemui.util.NotificationChannels
 import dagger.assisted.Assisted
@@ -107,11 +106,19 @@ internal constructor(
 
     /**
      * Shows a notification containing the screenshot and the chip actions
-     * @param imageData for actions, uri. cannot be null
+     * @param imageData for uri. cannot be null
      * @param bitmap for image preview. can be null
      */
     fun showPostActionNotification(imageData: ScreenshotController.SavedImageData, bitmap: Bitmap) {
-        val uri = imageData.uri
+        showPostActionNotification(imageData.uri, bitmap)
+    }
+
+    /**
+     * Shows a notification containing the screenshot and the chip actions
+     * @param uri image uri
+     * @param bitmap for image preview. can be null
+     */
+    fun showPostActionNotification(uri: Uri, bitmap: Bitmap) {
         // notification channel ID is the URI hash as string - to allow notifications to pile up
         // and still be able to get the same ID someplace else for dismiss
         val requestCode = uri.toString().hashCode()
@@ -133,7 +140,7 @@ internal constructor(
 
         val deleteIntent = PendingIntent.getBroadcast(context, requestCode,
                 Intent(context, DeleteScreenshotReceiver::class.java)
-                        .putExtra(SCREENSHOT_URI_ID, uri.toString())
+                        .setData(uri)
                         .addFlags(Intent.FLAG_RECEIVER_FOREGROUND),
                         PendingIntent.FLAG_IMMUTABLE)
         val actionDelete = Notification.Action.Builder(0 /* no icon */,

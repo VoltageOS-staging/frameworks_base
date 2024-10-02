@@ -347,9 +347,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                         return;
                     }
                     mAcquiredReceived = true;
-                    final View view = mOverlay.getTouchOverlay();
-                    unconfigureDisplay(view);
-                    tryAodSendFingerUp();
                 });
             } else {
                 boolean acquiredVendor = acquiredInfo == FINGERPRINT_ACQUIRED_VENDOR;

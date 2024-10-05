@@ -249,7 +249,6 @@ public class ThemeOverlayApplier implements Dumpable {
             }
 
             transaction.setEnabled(getOverlayID(OVERLAY_BERRY_BLACK_THEME), blackMode, currentUser);
-            transaction.setEnabled(getOverlayID("android:neutral"), !blackMode, currentUser);
 
             try {
                 mOverlayManager.commit(transaction.build());

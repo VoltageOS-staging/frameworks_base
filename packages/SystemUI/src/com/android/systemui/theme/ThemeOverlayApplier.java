@@ -90,9 +90,6 @@ public class ThemeOverlayApplier implements Dumpable {
 
     static final String TIMESTAMP_FIELD = "_applied_timestamp";
 
-    static final String OVERLAY_BERRY_BLACK_THEME =
-            "com.android.system.theme.black";
-
     @VisibleForTesting
     static final String OVERLAY_CATEGORY_FONT = "android.theme.customization.font";
     @VisibleForTesting
@@ -196,8 +193,7 @@ public class ThemeOverlayApplier implements Dumpable {
             FabricatedOverlay[] pendingCreation,
             int currentUser,
             Set<UserHandle> managedProfiles,
-            Runnable onComplete,
-            boolean blackMode
+            Runnable onComplete
     ) {
 
         mBgExecutor.execute(() -> {
@@ -248,8 +244,6 @@ public class ThemeOverlayApplier implements Dumpable {
                 }
             }
 
-            transaction.setEnabled(getOverlayID(OVERLAY_BERRY_BLACK_THEME), blackMode, currentUser);
-
             try {
                 mOverlayManager.commit(transaction.build());
                 if (onComplete != null) {
@@ -260,22 +254,6 @@ public class ThemeOverlayApplier implements Dumpable {
                 Log.e(TAG, "setEnabled failed", e);
             }
         });
-    }
-
-    private OverlayIdentifier getOverlayID(String name) throws IllegalStateException {
-        if (name.contains(":")) {
-            final String[] value = name.split(":");
-            final String pkgName = value[0];
-            final String overlayName = value[1];
-            final List<OverlayInfo> infos =
-                    mOverlayManager.getOverlayInfosForTarget(pkgName, UserHandle.CURRENT);
-            for (OverlayInfo info : infos) {
-                if (overlayName.equals(info.getOverlayName()))
-                    return info.getOverlayIdentifier();
-            }
-            throw new IllegalStateException("No overlay found for " + name);
-        }
-        return mOverlayManager.getOverlayInfo(name, UserHandle.CURRENT).getOverlayIdentifier();
     }
 
     @VisibleForTesting

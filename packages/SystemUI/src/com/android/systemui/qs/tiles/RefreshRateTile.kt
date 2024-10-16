@@ -30,11 +30,10 @@ import android.provider.Settings.System.PEAK_REFRESH_RATE
 import android.service.quicksettings.Tile
 import android.util.Log
 import android.view.Display
-import android.view.View
 
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent
 import com.android.internal.logging.MetricsLogger
-import com.android.systemui.res.R
+import com.android.systemui.animation.Expandable
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.plugins.qs.QSTile.Icon
@@ -46,6 +45,7 @@ import com.android.systemui.qs.logging.QSLogger
 import com.android.systemui.qs.tileimpl.QSTileImpl
 import com.android.systemui.qs.QSHost
 import com.android.systemui.qs.QsEventLogger
+import com.android.systemui.res.R
 import com.android.systemui.util.settings.SystemSettings
 
 import javax.inject.Inject
@@ -121,7 +121,7 @@ class RefreshRateTile @Inject constructor(
         settingsObserver.observe()
     }
 
-    override protected fun handleClick(view: View?) {
+    override protected fun handleClick(expandable: Expandable?) {
         logD("handleClick")
         refreshRateMode = getNextMode(refreshRateMode)
         logD("refreshRateMode = $refreshRateMode")
@@ -218,14 +218,14 @@ class RefreshRateTile @Inject constructor(
         fun observe() {
             if (isObserving) return
             isObserving = true
-            systemSettings.registerContentObserver(MIN_REFRESH_RATE, this)
-            systemSettings.registerContentObserver(PEAK_REFRESH_RATE, this)
+            systemSettings.registerContentObserverSync(MIN_REFRESH_RATE, this)
+            systemSettings.registerContentObserverSync(PEAK_REFRESH_RATE, this)
         }
 
         fun unobserve() {
             if (!isObserving) return
             isObserving = false
-            systemSettings.unregisterContentObserver(this)
+            systemSettings.unregisterContentObserverSync(this)
         }
     }
 
